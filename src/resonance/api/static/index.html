@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Resonance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* One dark surface, a single green accent, two columns on the mixer. */
+:root{
+  color-scheme: dark;
+  --bg:#121212;
+  --card:#181818;
+  --hover:#232323;
+  --line:rgba(255,255,255,.08);
+  --line-2:rgba(255,255,255,.16);
+  --text:#ffffff;
+  --text-2:#a7a7a7;
+  --text-3:#6f6f6f;
+  --green:#1db954;
+  --green-dark:#17a34a;
+  --blue:#3987e5;
+  --grid:#2a2a2a;
+  --font:"Figtree",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px; margin:0 auto; padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{margin:0; text-wrap:balance; letter-spacing:-.02em}
+button,input,select{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--green); outline-offset:2px; border-radius:4px}
+.num{font-variant-numeric:tabular-nums}
+
+header{position:sticky; top:env(safe-area-inset-top,0px); z-index:30; background:#0b0b0b; border-bottom:1px solid var(--line)}
+.top{display:flex; align-items:center; gap:28px; padding-block:14px; flex-wrap:wrap}
+.logo{display:flex; align-items:center; gap:9px}
+.logo svg{width:26px; height:26px; color:var(--green)}
+.logo b{font-size:19px; font-weight:700}
+nav{display:flex; gap:24px; overflow-x:auto}
+nav button{background:none; border:0; padding:4px 0; cursor:pointer; color:var(--text-3); font-weight:600; font-size:14px; white-space:nowrap; border-bottom:2px solid transparent}
+nav button[aria-selected="true"]{color:var(--text); border-bottom-color:var(--green)}
+nav button:hover{color:var(--text)}
+
+main{padding-block:26px 48px}
+.panel[hidden]{display:none!important}
+.card{background:var(--card); border-radius:10px; padding:18px}
+.card + .card{margin-top:14px}
+.card h3{font-size:14px; font-weight:700; margin-bottom:14px}
+.sub{color:var(--text-2); font-size:12.5px}
+
+/* mixer ------------------------------------------------------------------ */
+.mixer{display:grid; grid-template-columns:330px minmax(0,1fr); gap:22px; align-items:start}
+.mixer > *{min-width:0}
+@media (max-width:880px){.mixer{grid-template-columns:minmax(0,1fr)}}
+
+.search input{width:100%; background:var(--hover); border:1px solid transparent; border-radius:6px; padding:10px 12px; font-size:13.5px}
+.search input:focus{border-color:var(--line-2)}
+.results{margin-top:10px; max-height:152px; overflow-y:auto; scrollbar-width:thin}
+.seeds:not(:empty){border-top:1px solid var(--line); padding-top:14px}
+.results button{display:block; width:100%; text-align:left; background:none; border:0; cursor:pointer; padding:7px 9px; border-radius:6px}
+.results button:hover{background:var(--hover)}
+.results strong{display:block; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.results span{display:block; font-size:11.5px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+.seeds{display:flex; flex-wrap:wrap; gap:7px; margin-top:14px}
+.seed{display:inline-flex; align-items:center; gap:8px; max-width:100%; background:var(--hover); border-radius:999px; padding:5px 8px 5px 13px; font-size:12px}
+.seed span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
+.seed button{background:none; border:0; cursor:pointer; color:var(--text-3); padding:0 2px; line-height:1}
+.seed button:hover{color:var(--text)}
+.empty{color:var(--text-3); font-size:12.5px; margin:10px 0 0}
+
+.dial{margin-bottom:17px}
+.dial label{display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; color:var(--text-2); margin-bottom:7px; gap:10px}
+.dial label b{color:var(--text); font-weight:600}
+.dial p{margin:6px 0 0; font-size:11.5px; color:var(--text-3)}
+input[type=range]{width:100%; accent-color:var(--green); height:18px}
+.chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:4px}
+.chip{display:inline-flex; align-items:center; gap:7px; background:var(--hover); border:1px solid transparent; border-radius:999px; padding:6px 12px; font-size:12px; color:var(--text-2); cursor:pointer}
+.chip input{accent-color:var(--green); margin:0; width:13px; height:13px}
+.chip:has(input:checked){border-color:var(--green); color:var(--text)}
+.go{width:100%; margin-top:18px; background:var(--green); color:#000; border:0; border-radius:999px; padding:12px; font-weight:700; font-size:14px; cursor:pointer}
+.go:hover{background:#1ed760}
+.go:disabled{opacity:.4; cursor:not-allowed}
+
+.listhead{display:flex; align-items:baseline; justify-content:space-between; gap:14px; margin-bottom:14px; flex-wrap:wrap}
+.listhead h2{font-size:22px; font-weight:700}
+.row{display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:14px; align-items:center; padding:9px 12px; border-radius:8px}
+.row:hover{background:var(--card)}
+.row .i{color:var(--text-3); font-size:13px; text-align:right}
+.row strong{display:block; font-size:14.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.row .meta{font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.row .why{font-size:11.5px; color:var(--text-3); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.fit{display:flex; align-items:center; gap:11px}
+.fit b{font-size:13px; font-weight:600; width:38px; text-align:right}
+.bar{width:64px; height:4px; background:#3a3a3a; border-radius:2px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--green)}
+.add{background:none; border:1px solid var(--line-2); border-radius:50%; width:26px; height:26px; cursor:pointer; color:var(--text-2); line-height:1; flex:none}
+.add:hover{border-color:var(--text); color:var(--text)}
+@media (max-width:560px){
+  .row{grid-template-columns:22px minmax(0,1fr)}
+  .fit{grid-column:1/-1; padding-left:36px; justify-content:flex-start}
+}
+
+/* lab -------------------------------------------------------------------- */
+.lab{display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:22px; align-items:start}
+.lab > *{min-width:0}
+@media (max-width:880px){.lab{grid-template-columns:minmax(0,1fr)}}
+.sliders{display:grid; grid-template-columns:repeat(auto-fit,minmax(195px,1fr)); gap:4px 24px}
+.presets{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px}
+.preset{background:var(--hover); border:1px solid transparent; border-radius:999px; padding:7px 14px; font-size:12.5px; cursor:pointer; color:var(--text-2)}
+.preset:hover{color:var(--text)}
+.preset[aria-pressed="true"]{border-color:var(--green); color:var(--text)}
+.score{font-size:46px; font-weight:700; letter-spacing:-.03em; line-height:1; color:var(--green)}
+.verdict{font-size:13px; color:var(--text-2); margin-top:10px}
+.verdict b{color:var(--text)}
+.near{display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-top:1px solid var(--line)}
+.near div{min-width:0}
+.near strong{display:block; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.near span{font-size:11.5px; color:var(--text-3)}
+.near em{font-style:normal; font-size:12.5px; color:var(--text-2)}
+
+/* insights --------------------------------------------------------------- */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px}
+.tile{background:var(--card); border-radius:10px; padding:16px}
+.tile b{display:block; font-size:26px; font-weight:700; letter-spacing:-.02em}
+.tile span{display:block; font-size:12px; color:var(--text-2); margin-top:4px}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+.chart{width:100%; height:auto; display:block}
+.legend{display:flex; gap:16px; font-size:12px; color:var(--text-2); margin-bottom:10px}
+.legend i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:7px}
+.pick{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px}
+.pick button{background:var(--hover); border:1px solid transparent; border-radius:999px; padding:5px 11px; font-size:11.5px; cursor:pointer; color:var(--text-2)}
+.pick button[aria-pressed="true"]{border-color:var(--green); color:var(--text)}
+table{width:100%; border-collapse:collapse; font-size:12.5px}
+th,td{text-align:right; padding:7px 6px; border-bottom:1px solid var(--line); white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:11px; color:var(--text-3); font-weight:600}
+.note{font-size:12px; color:var(--text-3); margin:12px 0 0; line-height:1.5}
+.scroll{overflow-x:auto}
+
+#tip{position:fixed; z-index:60; pointer-events:none; opacity:0; transition:opacity .1s; background:#2a2a2a; border:1px solid var(--line-2); border-radius:6px; padding:7px 10px; font-size:12px; max-width:220px; white-space:pre-line}
+footer{border-top:1px solid var(--line); margin-top:34px; padding-block:16px; color:var(--text-3); font-size:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap top">
+    <div class="logo">
+      <svg viewBox="0 0 26 26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M2 13h2.5"/><path d="M8 8v10"/><path d="M13 4v18"/><path d="M18 7v12"/><path d="M23.5 11v4"/>
+      </svg>
+      <b>Resonance</b>
+    </div>
+    <nav role="tablist">
+      <button role="tab" aria-selected="true" data-tab="mixer">Mixer</button>
+      <button role="tab" aria-selected="false" data-tab="lab">Taste lab</button>
+      <button role="tab" aria-selected="false" data-tab="insights">Insights</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="panel" id="panel-mixer">
+    <div class="mixer">
+      <div>
+        <div class="card">
+          <h3>Seeds</h3>
+          <div class="search"><input id="q" type="search" placeholder="Search a track or artist" autocomplete="off"></div>
+          <div class="results" id="search-results"></div>
+          <div class="seeds" id="seed-list"></div>
+        </div>
+
+        <div class="card">
+          <h3>Settings</h3>
+          <div class="dial">
+            <label for="k">Tracks <b id="k-val" class="num">12</b></label>
+            <input id="k" type="range" min="5" max="30" step="1" value="12">
+          </div>
+          <div class="dial">
+            <label for="taste">Taste weight <b id="taste-val" class="num">0.35</b></label>
+            <input id="taste" type="range" min="0" max="1" step="0.05" value="0.35">
+            <p>0 keeps close to the seed, 1 follows the model's favourites.</p>
+          </div>
+          <div class="dial">
+            <label for="div">Diversity <b id="div-val" class="num">0.25</b></label>
+            <input id="div" type="range" min="0" max="0.9" step="0.05" value="0.25">
+            <p>Spreads the picks apart so they are not near-duplicates.</p>
+          </div>
+          <div class="dial">
+            <label for="tempo-min">Tempo floor <b class="num"><span id="tempo-val">0</span> BPM</b></label>
+            <input id="tempo-min" type="range" min="0" max="200" step="5" value="0">
+          </div>
+          <div class="dial">
+            <label for="dur-max">Length cap <b id="dur-val" class="num">none</b></label>
+            <input id="dur-max" type="range" min="2" max="11" step="0.5" value="11">
+          </div>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" id="f-spoken"> No spoken word</label>
+            <label class="chip"><input type="checkbox" id="f-inst"> Instrumental</label>
+            <label class="chip"><input type="checkbox" id="f-ac"> Acoustic</label>
+            <label class="chip"><input type="checkbox" id="f-artist"> Skip seed artists</label>
+          </div>
+          <button class="go" id="generate" type="button">Build playlist</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="listhead">
+          <h2 id="pl-title">Playlist</h2>
+          <p class="sub" id="pl-sub"></p>
+        </div>
+        <div id="playlist"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-lab" hidden>
+    <div class="lab">
+      <div class="card">
+        <h3>Build a track</h3>
+        <div class="presets" id="presets"></div>
+        <div class="sliders" id="lab-sliders"></div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Predicted fit</h3>
+          <div class="score" id="lab-p">0%</div>
+          <svg viewBox="0 0 200 6" class="chart" style="margin:14px 0 0" aria-hidden="true">
+            <rect x="0" y="1" width="200" height="4" rx="2" fill="#3a3a3a"/>
+            <rect id="lab-bar" x="0" y="1" width="0" height="4" rx="2" fill="#1db954"/>
+          </svg>
+          <p class="verdict" id="lab-verdict"></p>
+          <p class="note" id="lab-source"></p>
+        </div>
+        <div class="card">
+          <h3>Closest real tracks</h3>
+          <div id="lab-nearest"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-insights" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="two">
+      <div class="card">
+        <h3>Model comparison</h3>
+        <p class="sub" style="margin:-8px 0 14px">ROC-AUC, 5-fold cross-validation</p>
+        <div id="chart-leaderboard"></div>
+      </div>
+      <div class="card">
+        <h3>ROC curve</h3>
+        <p class="sub" style="margin:-8px 0 14px" id="roc-sub"></p>
+        <div id="chart-roc"></div>
+      </div>
+      <div class="card">
+        <h3>Feature importance</h3>
+        <p class="sub" style="margin:-8px 0 14px">AUC lost when a column is shuffled</p>
+        <div id="chart-importance"></div>
+      </div>
+      <div class="card">
+        <h3>Liked vs skipped</h3>
+        <div class="pick" id="dist-pick"></div>
+        <div class="legend">
+          <span><i style="background:#17a34a"></i>Liked</span>
+          <span><i style="background:#3987e5"></i>Skipped</span>
+        </div>
+        <div id="chart-dist"></div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <h3>Significance tests</h3>
+        <p class="sub" style="margin:-8px 0 14px">One-way ANOVA against the like/skip split</p>
+        <div class="scroll"><table id="anova-table"></table></div>
+        <p class="note">With n close to 2,000 almost any difference reaches p &lt; 0.05, so Cohen's d is the column to read. It says how far apart the two groups really sit.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer id="foot"></footer>
+</main>
+
+<div id="tip" role="status"></div>
+
+<script>
+"use strict";
+/* Resonance dashboard.
+   It calls the API when one is running. Otherwise it loads snapshot.json and
+   runs the same ranking in the browser. */
+
+const FEATURES = ["acousticness","danceability","energy","instrumentalness","liveness","loudness","speechiness","tempo","valence","duration_ms"];
+const KEYS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const PRETTY = {acousticness:"Acousticness",danceability:"Danceability",energy:"Energy",instrumentalness:"Instrumentalness",liveness:"Liveness",loudness:"Loudness",speechiness:"Speechiness",tempo:"Tempo",valence:"Valence",duration_ms:"Duration"};
+const SHORT = {acousticness:"acousticness",danceability:"danceability",energy:"energy",instrumentalness:"instrumentalness",liveness:"liveness",loudness:"loudness",speechiness:"speechiness",tempo:"tempo",valence:"valence",duration_ms:"length"};
+const RANGES = {acousticness:[0,1,.01],danceability:[0,1,.01],energy:[0,1,.01],instrumentalness:[0,1,.01],liveness:[0,1,.01],speechiness:[0,1,.01],valence:[0,1,.01],loudness:[-30,0,.5],tempo:[50,200,1],duration_ms:[60000,600000,5000]};
+const GREEN = "#17a34a", BLUE = "#3987e5";
+
+const S = {snapshot:null, api:false, tracks:[], byId:new Map(), vec:null, dim:0, seeds:[], distFeature:"instrumentalness", profile:{}};
+
+const $ = (s)=>document.querySelector(s);
+const $$ = (s)=>Array.from(document.querySelectorAll(s));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const pct=(v)=>Math.round(v*100)+"%";
+const dur=(ms)=>{const s=Math.round(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");};
+const esc=(s)=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* boot ------------------------------------------------------------------- */
+async function loadSnapshot(){
+  for(const path of ["snapshot.json","static/snapshot.json","/static/snapshot.json"]){
+    try{ const r = await fetch(path); if(r.ok) return await r.json(); }catch(e){ /* next */ }
+  }
+  throw new Error("snapshot.json is not reachable");
+}
+async function boot(){
+  S.snapshot = await loadSnapshot();
+  S.tracks = S.snapshot.tracks.map((t,i)=>({
+    id:t.id, title:t.t, artist:t.a, key:t.k, mode:t.m, p:t.p, liked:t.y, idx:i,
+    f:Object.fromEntries(S.snapshot.fields.map((name,j)=>[name,t.f[j]]))
+  }));
+  S.tracks.forEach(t=>S.byId.set(t.id,t));
+  S.dim = S.snapshot.space.columns.length;
+  S.vec = Float32Array.from(S.snapshot.vectors.flat());
+
+  try{ const r = await fetch("api/health"); S.api = r.ok && (await r.json()).status === "ok"; }
+  catch(e){ S.api = false; }
+
+  const m = S.snapshot.metrics;
+  $("#foot").textContent = [
+    S.snapshot.model_name + (m ? ", AUC " + m.test_metrics.roc_auc.toFixed(3) : ""),
+    S.tracks.length.toLocaleString() + " labelled tracks",
+    S.api ? "live API" : "offline snapshot",
+    m ? "trained " + m.generated_at.slice(0,10) : ""
+  ].filter(Boolean).join("  ·  ");
+
+  initMixer();
+  initLab();
+  if(m) initInsights(m);
+
+  addSeed((S.byId.get("08cb6b5d2e9d") || S.tracks.find(t=>t.liked===1)).id);
+  generate();
+}
+
+/* ranking ---------------------------------------------------------------- */
+function dot(i,q){ let s=0; const o=i*S.dim; for(let d=0;d<S.dim;d++) s+=S.vec[o+d]*q[d]; return s; }
+function dotPair(i,j){ let s=0; const a=i*S.dim,b=j*S.dim; for(let d=0;d<S.dim;d++) s+=S.vec[a+d]*S.vec[b+d]; return s; }
+function unit(v){ let n=0; for(const x of v) n+=x*x; n=Math.sqrt(n)||1e-9; return v.map(x=>x/n); }
+function seedVector(ids){
+  const q = new Array(S.dim).fill(0); let n=0;
+  for(const id of ids){ const t=S.byId.get(id); if(!t) continue; const o=t.idx*S.dim;
+    for(let d=0;d<S.dim;d++) q[d]+=S.vec[o+d]; n++; }
+  if(!n) throw new Error("no valid seeds");
+  return unit(q.map(x=>x/n));
+}
+let _med=null;
+function median(f){
+  if(!_med){ _med={}; for(const name of FEATURES){ const c=S.tracks.map(t=>t.f[name]).sort((a,b)=>a-b); _med[name]=c[c.length>>1]; } }
+  return _med[f];
+}
+function interp(x, knots){
+  const n=knots.length;
+  if(x<=knots[0]) return 0;
+  if(x>=knots[n-1]) return 1;
+  let lo=0, hi=n-1;
+  while(hi-lo>1){ const mid=(lo+hi)>>1; (knots[mid]<=x) ? lo=mid : hi=mid; }
+  const span=knots[hi]-knots[lo];
+  return (lo + (span>1e-12 ? (x-knots[lo])/span : 0))/(n-1);
+}
+function profileVector(profile){
+  const sp=S.snapshot.space;
+  const vals={...Object.fromEntries(FEATURES.map(f=>[f,median(f)])), ...profile};
+  return unit(sp.columns.map((col,i)=>interp(vals[col], sp.quantiles[i])*sp.weights[i]));
+}
+function passes(t,F){
+  if(F.tempo_min && t.f.tempo < F.tempo_min) return false;
+  if(F.duration_max_min && t.f.duration_ms > F.duration_max_min*60000) return false;
+  if(F.exclude_spoken && t.f.speechiness > 0.33) return false;
+  if(F.instrumental_only && t.f.instrumentalness <= 0.5) return false;
+  if(F.acoustic_only && t.f.acousticness <= 0.5) return false;
+  if(F.exclude_artists && F.exclude_artists.has(t.artist.toLowerCase())) return false;
+  return true;
+}
+function rankLocal(q,{k,taste,diversity,filters,exclude}){
+  const cand=[];
+  for(const t of S.tracks){
+    if(exclude.has(t.id)) continue;
+    if(filters && !passes(t,filters)) continue;
+    cand.push({t, sim:dot(t.idx,q)});
+  }
+  if(!cand.length) return [];
+  let lo=Infinity, hi=-Infinity;
+  for(const c of cand){ if(c.sim<lo) lo=c.sim; if(c.sim>hi) hi=c.sim; }
+  const span=Math.max(hi-lo,1e-9);
+  for(const c of cand) c.score=(1-taste)*((c.sim-lo)/span)+taste*c.t.p;
+  cand.sort((a,b)=>b.score-a.score);
+  const pool=cand.slice(0, Math.max(k*6,60));
+  if(diversity<=0) return pool.slice(0,k);
+
+  const chosen=[pool[0]], rest=pool.slice(1);
+  const best=new Map(rest.map(c=>[c,-1]));
+  while(chosen.length<k && rest.length){
+    const last=chosen[chosen.length-1].t;
+    let pick=0, top=-Infinity;
+    for(let i=0;i<rest.length;i++){
+      const c=rest[i];
+      const worst=Math.max(best.get(c), dotPair(c.t.idx,last.idx));
+      best.set(c,worst);
+      const s=(1-diversity)*c.score - diversity*worst;
+      if(s>top){ top=s; pick=i; }
+    }
+    chosen.push(rest[pick]); rest.splice(pick,1);
+  }
+  return chosen;
+}
+const _sd={};
+function stdev(f){
+  if(_sd[f]==null){
+    const c=S.tracks.map(t=>t.f[f]);
+    const mu=c.reduce((a,b)=>a+b,0)/c.length;
+    _sd[f]=Math.sqrt(c.reduce((a,b)=>a+(b-mu)**2,0)/c.length)||1e-9;
+  }
+  return _sd[f];
+}
+function explainLocal(seedIds, track){
+  const sp=S.snapshot.space;
+  const seeds=seedIds.map(id=>S.byId.get(id)).filter(Boolean);
+  const rows=sp.columns.map((col,i)=>{
+    const seedVal=seeds.reduce((a,t)=>a+t.f[col],0)/seeds.length;
+    const gap=Math.abs(track.f[col]-seedVal)/stdev(col);
+    return {feature:col, gap, weight:sp.weights[i], agreement:Math.exp(-gap)*sp.weights[i]};
+  });
+  rows.sort((a,b)=>b.agreement-a.agreement);
+  const out=rows.slice(0,2).map(r=>({...r, role:"match"}));
+  const contrast=rows.reduce((a,b)=>(b.gap*b.weight > a.gap*a.weight ? b : a));
+  if(!out.some(r=>r.feature===contrast.feature)) out.push({...contrast, role:"contrast"});
+  return out;
+}
+function whyLine(why){
+  if(!why || !why.length) return "";
+  const m=why.filter(w=>w.role==="match").map(w=>SHORT[w.feature]||w.feature).slice(0,2);
+  const c=why.find(w=>w.role==="contrast");
+  let s = m.length ? "Close on " + m.join(" and ") : "";
+  if(c) s += (s ? ", " : "") + "different " + (SHORT[c.feature]||c.feature);
+  return s;
+}
+
+/* mixer ------------------------------------------------------------------ */
+function initMixer(){
+  $("#q").addEventListener("input", e=>renderSearch(e.target.value));
+  renderSearch("");
+  const bind=(id,out,fmt)=>{ const el=$("#"+id); const show=()=>{$("#"+out).textContent=fmt(el.value);}; el.addEventListener("input",show); show(); };
+  bind("k","k-val",v=>v);
+  bind("taste","taste-val",v=>Number(v).toFixed(2));
+  bind("div","div-val",v=>Number(v).toFixed(2));
+  bind("tempo-min","tempo-val",v=>v);
+  bind("dur-max","dur-val",v=>Number(v)>=11 ? "none" : Number(v).toFixed(1)+" min");
+  $("#generate").addEventListener("click", generate);
+}
+function renderSearch(query){
+  const q=query.trim().toLowerCase();
+  let hits;
+  if(!q){ hits=S.tracks.slice().sort((a,b)=>b.p-a.p).slice(0,40); }
+  else{
+    hits=S.tracks.filter(t=>t.title.toLowerCase().includes(q)||t.artist.toLowerCase().includes(q));
+    hits.sort((a,b)=>{
+      const as=a.title.toLowerCase().startsWith(q)||a.artist.toLowerCase().startsWith(q);
+      const bs=b.title.toLowerCase().startsWith(q)||b.artist.toLowerCase().startsWith(q);
+      return (bs-as)||(b.p-a.p);
+    });
+    hits=hits.slice(0,40);
+  }
+  const box=$("#search-results");
+  box.innerHTML = hits.map(t=>`<button type="button" data-id="${t.id}"><strong>${esc(t.title)}</strong><span>${esc(t.artist)}  ·  ${dur(t.f.duration_ms)}</span></button>`).join("")
+    || '<p class="empty">Nothing matches that.</p>';
+  box.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>addSeed(b.dataset.id)));
+}
+function addSeed(id){ if(S.seeds.includes(id)||S.seeds.length>=20) return; S.seeds.push(id); renderSeeds(); }
+function removeSeed(id){ S.seeds=S.seeds.filter(s=>s!==id); renderSeeds(); }
+function renderSeeds(){
+  const box=$("#seed-list");
+  $("#generate").disabled = S.seeds.length===0;
+  if(!S.seeds.length){ box.innerHTML='<p class="empty">Pick a track to start from.</p>'; return; }
+  box.innerHTML = S.seeds.map(id=>{
+    const t=S.byId.get(id);
+    return `<span class="seed"><span>${esc(t.title)}, ${esc(t.artist)}</span><button type="button" data-id="${id}" aria-label="Remove ${esc(t.title)}">✕</button></span>`;
+  }).join("");
+  box.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>removeSeed(b.dataset.id)));
+}
+function settings(){
+  const d=Number($("#dur-max").value), tmin=Number($("#tempo-min").value);
+  return {
+    k:Number($("#k").value),
+    taste_weight:Number($("#taste").value),
+    diversity:Number($("#div").value),
+    exclude_seed_artists:$("#f-artist").checked,
+    filters:{
+      tempo_min: tmin||null,
+      duration_max_min: d>=11 ? null : d,
+      exclude_spoken:$("#f-spoken").checked,
+      instrumental_only:$("#f-inst").checked,
+      acoustic_only:$("#f-ac").checked
+    }
+  };
+}
+async function generate(){
+  if(!S.seeds.length) return;
+  const cfg=settings();
+  const t0=performance.now();
+  let results=null;
+
+  if(S.api){
+    try{
+      const r=await fetch("api/recommend",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({seed_ids:S.seeds, explain:true, ...cfg})});
+      if(!r.ok) throw new Error(r.statusText);
+      const d=await r.json();
+      results=d.results.map(t=>({
+        id:t.track_id, title:t.song_title, artist:t.artist, p:t.p_like, score:t.score,
+        key:t.key, mode:t.mode, f:Object.fromEntries(FEATURES.map(f=>[f,t[f] ?? 0])), why:t.why||[]
+      }));
+    }catch(e){ S.api=false; }
+  }
+  if(!results){
+    const F={...cfg.filters};
+    if(cfg.exclude_seed_artists) F.exclude_artists=new Set(S.seeds.map(id=>S.byId.get(id).artist.toLowerCase()));
+    results = rankLocal(seedVector(S.seeds), {k:cfg.k, taste:cfg.taste_weight, diversity:cfg.diversity, filters:F, exclude:new Set(S.seeds)})
+      .map(c=>({...c.t, score:c.score, why:explainLocal(S.seeds, c.t)}));
+  }
+  render(results, cfg, performance.now()-t0);
+}
+function render(items, cfg, ms){
+  const names=S.seeds.map(id=>S.byId.get(id).title);
+  $("#pl-title").textContent = items.length ? items.length + " tracks" : "Nothing fits";
+  $("#pl-sub").textContent = items.length
+    ? `from ${names.slice(0,2).join(", ")}${names.length>2?" and "+(names.length-2)+" more":""}  ·  ${ms.toFixed(0)} ms`
+    : "Loosen the filters, nothing in the catalog satisfies all of them.";
+  $("#playlist").innerHTML = items.map((t,i)=>`
+    <article class="row">
+      <div class="i num">${i+1}</div>
+      <div>
+        <strong>${esc(t.title)}</strong>
+        <div class="meta">${esc(t.artist)}  ·  ${dur(t.f.duration_ms)}  ·  ${Math.round(t.f.tempo)} BPM  ·  ${KEYS[t.key%12]}${t.mode===1?"":"m"}</div>
+        <div class="why">${esc(whyLine(t.why))}</div>
+      </div>
+      <div class="fit">
+        <b class="num">${pct(t.p)}</b>
+        <span class="bar"><i style="width:${clamp(t.p*100,2,100)}%"></i></span>
+        <button class="add" type="button" data-seed="${t.id}" title="Add as seed" aria-label="Add ${esc(t.title)} as seed">+</button>
+      </div>
+    </article>`).join("");
+  $("#playlist").querySelectorAll("[data-seed]").forEach(b=>
+    b.addEventListener("click",()=>{ addSeed(b.dataset.seed); generate(); }));
+}
+
+/* taste lab -------------------------------------------------------------- */
+const PRESETS = {
+  "Late night": {danceability:.86,energy:.62,valence:.35,speechiness:.33,acousticness:.05,instrumentalness:0,tempo:88,loudness:-6.5,liveness:.12,duration_ms:215000},
+  "Sunday morning": {danceability:.45,energy:.28,valence:.52,speechiness:.04,acousticness:.82,instrumentalness:.15,tempo:96,loudness:-14,liveness:.1,duration_ms:245000},
+  "Festival": {danceability:.72,energy:.95,valence:.72,speechiness:.06,acousticness:.02,instrumentalness:.2,tempo:128,loudness:-4,liveness:.3,duration_ms:280000},
+  "Focus": {danceability:.5,energy:.4,valence:.3,speechiness:.04,acousticness:.3,instrumentalness:.9,tempo:110,loudness:-12,liveness:.09,duration_ms:360000}
+};
+function initLab(){
+  $("#presets").innerHTML = Object.keys(PRESETS).map((n,i)=>
+    `<button class="preset" type="button" data-preset="${esc(n)}" aria-pressed="${i===0}">${esc(n)}</button>`).join("");
+  $("#presets").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>applyPreset(b.dataset.preset)));
+  $("#lab-sliders").innerHTML = FEATURES.map(f=>{
+    const [min,max,step]=RANGES[f];
+    return `<div class="dial">
+      <label for="lab-${f}">${PRETTY[f]} <b class="num" id="lab-${f}-val"></b></label>
+      <input id="lab-${f}" type="range" min="${min}" max="${max}" step="${step}" data-f="${f}">
+    </div>`;
+  }).join("");
+  $$("#lab-sliders input").forEach(el=>el.addEventListener("input",()=>{
+    S.profile[el.dataset.f]=Number(el.value);
+    labValue(el.dataset.f);
+    $$("#presets button").forEach(b=>b.setAttribute("aria-pressed","false"));
+    scoreProfile();
+  }));
+  applyPreset("Late night");
+}
+function labValue(f){
+  const v=S.profile[f];
+  $(`#lab-${f}-val`).textContent = f==="duration_ms" ? dur(v)
+    : f==="tempo" ? Math.round(v)+" BPM"
+    : f==="loudness" ? v.toFixed(1)+" dB" : v.toFixed(2);
+}
+function applyPreset(name){
+  S.profile={...PRESETS[name]};
+  for(const f of FEATURES){ $(`#lab-${f}`).value=S.profile[f]; labValue(f); }
+  $$("#presets button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.preset===name)));
+  scoreProfile();
+}
+let labTimer=null;
+function scoreProfile(){ clearTimeout(labTimer); labTimer=setTimeout(doScore,120); }
+async function doScore(){
+  let p=null, source="";
+  if(S.api){
+    try{
+      const r=await fetch("api/predict",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({profile:{...S.profile, duration_ms:Math.round(S.profile.duration_ms)}, k:5})});
+      if(r.ok){ p=(await r.json()).p_like; source="Scored by the trained model on the server."; }
+    }catch(e){ S.api=false; }
+  }
+  const near = rankLocal(profileVector(S.profile), {k:25, taste:0, diversity:0, filters:null, exclude:new Set()});
+  if(p===null){
+    let num=0, den=0;
+    for(const c of near){ const w=Math.max(c.sim,0)**8; num+=w*c.t.p; den+=w; }
+    p = den ? num/den : 0.5;
+    source="Estimated from the 25 nearest catalog tracks. The model itself runs server-side.";
+  }
+  const verdict = p>=.7 ? "strong match" : p>=.55 ? "likely" : p>=.45 ? "borderline" : "unlikely";
+  const rank = Math.round(S.tracks.filter(t=>t.p<p).length/S.tracks.length*100);
+  $("#lab-p").textContent = pct(p);
+  $("#lab-bar").setAttribute("width", String(clamp(p,0,1)*200));
+  $("#lab-verdict").innerHTML = `<b>${verdict}</b>, ahead of ${rank}% of the catalog`;
+  $("#lab-source").textContent = source;
+  $("#lab-nearest").innerHTML = near.slice(0,5).map(c=>`
+    <div class="near">
+      <div><strong>${esc(c.t.title)}</strong><span>${esc(c.t.artist)}</span></div>
+      <em class="num">${(c.sim*100).toFixed(1)}</em>
+    </div>`).join("");
+}
+
+/* insights --------------------------------------------------------------- */
+function initInsights(m){
+  const t=m.test_metrics, ds=m.dataset;
+  $("#tiles").innerHTML = [
+    [t.roc_auc.toFixed(3), "ROC-AUC on held-out tracks"],
+    [pct(t.accuracy), "Accuracy"],
+    [pct(t.ranking.precision_at_10), "Precision at 10"],
+    ["×"+t.ranking.lift_at_10.toFixed(2), "Lift over random"],
+    [t.brier.toFixed(3), "Brier score"],
+    [ds.n_tracks.toLocaleString(), ds.n_artists.toLocaleString()+" artists"]
+  ].map(([v,k])=>`<div class="tile"><b class="num">${v}</b><span>${k}</span></div>`).join("");
+  $("#roc-sub").textContent = `${m.split.test} tracks held out, AUC ${t.roc_auc.toFixed(3)}`;
+
+  bars("#chart-leaderboard", m.leaderboard.map(r=>({
+    label:r.model, value:r.roc_auc, note:"±"+r.roc_auc_std.toFixed(3),
+    tip:`${r.model}\nAUC ${r.roc_auc.toFixed(3)} ±${r.roc_auc_std.toFixed(3)}\nAccuracy ${pct(r.accuracy)}, F1 ${r.f1.toFixed(3)}`
+  })), {min:0.5, max:0.9, fmt:v=>v.toFixed(3), highlight:m.best_model.name});
+
+  roc("#chart-roc", t.roc_curve, t.roc_auc);
+
+  const imp=m.permutation_importance.slice(0,8);
+  bars("#chart-importance", imp.map(r=>({
+    label:PRETTY[r.feature]||r.feature.replace(/_/g," "), value:r.importance, note:"",
+    tip:`${PRETTY[r.feature]||r.feature}\nAUC drop ${r.importance.toFixed(4)}`
+  })), {min:0, max:imp[0].importance*1.15, fmt:v=>v.toFixed(3)});
+
+  $("#dist-pick").innerHTML = FEATURES.map(f=>
+    `<button type="button" data-f="${f}" aria-pressed="${f===S.distFeature}">${PRETTY[f]}</button>`).join("");
+  $("#dist-pick").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+    S.distFeature=b.dataset.f;
+    $$("#dist-pick button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.f===S.distFeature)));
+    dist("#chart-dist", m.distributions[S.distFeature], S.distFeature);
+  }));
+  dist("#chart-dist", m.distributions[S.distFeature], S.distFeature);
+  anova("#anova-table", m.anova);
+}
+
+const tip=$("#tip");
+function showTip(e,text){
+  tip.textContent=text; tip.style.opacity="1";
+  tip.style.left = Math.min(e.clientX+14, window.innerWidth-tip.offsetWidth-8)+"px";
+  tip.style.top = Math.max(e.clientY-tip.offsetHeight-14, 8)+"px";
+}
+function hideTip(){ tip.style.opacity="0"; }
+function mount(sel,svg){
+  const host=$(sel); host.innerHTML=svg;
+  host.querySelectorAll("[data-tip]").forEach(el=>{
+    el.addEventListener("mousemove",e=>showTip(e,el.dataset.tip));
+    el.addEventListener("mouseleave",hideTip);
+  });
+}
+
+function bars(sel, rows, {min=0,max=1,fmt=v=>v,highlight=null}={}){
+  const rowH=26, padL=140, padR=54, w=540, h=rows.length*rowH+6;
+  const len=(v)=>Math.max((clamp(v,min,max)-min)/(max-min)*(w-padL-padR), 2);
+  mount(sel, `<svg viewBox="0 0 ${w} ${h}" class="chart" role="img" aria-label="bar chart">
+    ${rows.map((r,i)=>{
+      const y=i*rowH+4, L=len(r.value), on = highlight && r.label===highlight;
+      return `<g data-tip="${esc(r.tip||r.label)}">
+        <rect x="0" y="${y-4}" width="${w}" height="${rowH}" fill="transparent"/>
+        <text x="${padL-12}" y="${y+12}" text-anchor="end" font-size="12" fill="#a7a7a7">${esc(r.label)}</text>
+        <rect x="${padL}" y="${y+3}" width="${L}" height="10" rx="3" fill="${on?"#1db954":"#3a3a3a"}"/>
+        <text x="${padL+L+9}" y="${y+12}" font-size="11.5" fill="${on?"#ffffff":"#a7a7a7"}">${fmt(r.value)}${r.note?" "+r.note:""}</text>
+      </g>`;
+    }).join("")}
+  </svg>`);
+}
+
+function roc(sel, curve, auc){
+  const w=440,h=290,p=36;
+  const X=v=>p+v*(w-p-14), Y=v=>h-p-v*(h-p-16);
+  const path=curve.map(([x,y],i)=>`${i?"L":"M"}${X(x).toFixed(1)},${Y(y).toFixed(1)}`).join("");
+  const ticks=[0,.25,.5,.75,1].map(t=>`
+    <line x1="${X(t)}" y1="${Y(0)}" x2="${X(t)}" y2="${Y(1)}" stroke="#2a2a2a"/>
+    <line x1="${X(0)}" y1="${Y(t)}" x2="${X(1)}" y2="${Y(t)}" stroke="#2a2a2a"/>
+    <text x="${X(t)}" y="${h-p+16}" text-anchor="middle" font-size="10" fill="#6f6f6f">${t}</text>
+    <text x="${p-8}" y="${Y(t)+3}" text-anchor="end" font-size="10" fill="#6f6f6f">${t}</text>`).join("");
+  const dots=curve.filter((_,i)=>i%6===0).map(([x,y])=>
+    `<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="7" fill="transparent" data-tip="${(y*100).toFixed(1)}% of liked tracks caught\nat ${(x*100).toFixed(1)}% false positives"/>`).join("");
+  mount(sel, `<svg viewBox="0 0 ${w} ${h}" class="chart" role="img" aria-label="ROC curve, AUC ${auc}">
+    ${ticks}
+    <line x1="${X(0)}" y1="${Y(0)}" x2="${X(1)}" y2="${Y(1)}" stroke="#6f6f6f" stroke-dasharray="4 4"/>
+    <path d="${path}L${X(1)},${Y(0)}L${X(0)},${Y(0)}Z" fill="${GREEN}" opacity=".16"/>
+    <path d="${path}" fill="none" stroke="#1db954" stroke-width="2" stroke-linejoin="round"/>
+    ${dots}
+    <text x="${X(.55)}" y="${Y(.3)}" font-size="12.5" fill="#ffffff">AUC ${auc.toFixed(3)}</text>
+    <text x="${X(.3)}" y="${Y(.41)}" font-size="10.5" fill="#6f6f6f" transform="rotate(-34 ${X(.3)} ${Y(.41)})">random</text>
+    <text x="${X(.5)}" y="${h-5}" text-anchor="middle" font-size="10.5" fill="#6f6f6f">false positive rate</text>
+  </svg>`);
+}
+
+function dist(sel, d, feature){
+  const w=520,h=250,p=38;
+  const n=d.class_1.length, peak=Math.max(...d.class_0,...d.class_1), bw=(w-p-14)/n;
+  const Y=v=>h-p-(v/peak)*(h-p-22);
+  const fmt=v=>feature==="duration_ms" ? dur(v) : v.toFixed(2);
+  const bars=[];
+  for(let i=0;i<n;i++){
+    const x=p+i*bw;
+    bars.push(`<g data-tip="${fmt(d.edges[i])} to ${fmt(d.edges[i+1])}\nliked ${d.class_1[i]}, skipped ${d.class_0[i]}">
+      <rect x="${x}" y="8" width="${bw}" height="${h-p-8}" fill="transparent"/>
+      <rect x="${x+1}" y="${Y(d.class_1[i])}" width="${Math.max(bw/2-2,1)}" height="${h-p-Y(d.class_1[i])}" fill="${GREEN}" rx="2"/>
+      <rect x="${x+bw/2+1}" y="${Y(d.class_0[i])}" width="${Math.max(bw/2-2,1)}" height="${h-p-Y(d.class_0[i])}" fill="${BLUE}" rx="2"/>
+    </g>`);
+  }
+  const at=v=>p+((v-d.edges[0])/(d.edges[n]-d.edges[0]))*(w-p-14);
+  const yTicks=[0,Math.round(peak/2),peak].map(v=>`
+    <line x1="${p}" y1="${Y(v)}" x2="${w-14}" y2="${Y(v)}" stroke="#2a2a2a"/>
+    <text x="${p-7}" y="${Y(v)+3.5}" text-anchor="end" font-size="10" fill="#6f6f6f">${v}</text>`).join("");
+  mount(sel, `<svg viewBox="0 0 ${w} ${h}" class="chart" role="img" aria-label="${feature} by class">
+    ${yTicks}${bars.join("")}
+    <line x1="${at(d.mean_1)}" y1="14" x2="${at(d.mean_1)}" y2="${h-p}" stroke="${GREEN}" stroke-dasharray="3 3"/>
+    <line x1="${at(d.mean_0)}" y1="14" x2="${at(d.mean_0)}" y2="${h-p}" stroke="${BLUE}" stroke-dasharray="3 3"/>
+    <text x="${p}" y="${h-10}" font-size="10" fill="#6f6f6f">${fmt(d.edges[0])}</text>
+    <text x="${w-14}" y="${h-10}" text-anchor="end" font-size="10" fill="#6f6f6f">${fmt(d.edges[n])}</text>
+    <text x="${w-14}" y="14" text-anchor="end" font-size="10.5" fill="#6f6f6f">dashed lines are group means</text>
+  </svg>`);
+}
+
+function anova(sel, rows){
+  const cell=(v,f)=> f==="duration_ms" ? dur(v) : f==="tempo"||f==="loudness" ? v.toFixed(1) : v.toFixed(3);
+  $(sel).innerHTML = `<thead><tr><th>Feature</th><th>F</th><th>p</th><th>Cohen's d</th><th>Skipped</th><th>Liked</th></tr></thead><tbody>`
+    + rows.map(r=>{
+        const p = r.p_value<1e-4 ? r.p_value.toExponential(1) : r.p_value.toFixed(4);
+        const strong = Math.abs(r.cohens_d)>=0.2;
+        return `<tr>
+          <td>${PRETTY[r.feature]||r.feature}</td>
+          <td class="num">${r.f_statistic.toFixed(1)}</td>
+          <td class="num" style="color:${r.significant?"#ffffff":"#6f6f6f"}">${p}</td>
+          <td class="num" style="color:${strong?(r.cohens_d>0?"#1db954":"#3987e5"):"#6f6f6f"}">${r.cohens_d>0?"+":""}${r.cohens_d.toFixed(2)}</td>
+          <td class="num">${cell(r.mean_disliked,r.feature)}</td>
+          <td class="num">${cell(r.mean_liked,r.feature)}</td>
+        </tr>`;
+      }).join("") + "</tbody>";
+}
+
+/* tabs ------------------------------------------------------------------- */
+$$("nav button").forEach(btn=>btn.addEventListener("click",()=>{
+  $$("nav button").forEach(b=>b.setAttribute("aria-selected",String(b===btn)));
+  for(const name of ["mixer","lab","insights"]) $("#panel-"+name).hidden = (name!==btn.dataset.tab);
+}));
+
+boot().catch(err=>{
+  document.querySelector("main").insertAdjacentHTML("afterbegin",
+    `<div class="card"><h3>The dashboard could not start</h3><p class="sub">${esc(err.message)}. Run <code>python -m resonance.train</code>, then <code>python -m resonance.export_snapshot</code>, and reload.</p></div>`);
+});
+</script>
+</body>
+</html>

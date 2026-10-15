@@ -1,0 +1,44 @@
+name: Deploy dashboard
+
+# The dashboard runs without a backend: it falls back to the bundled snapshot
+# and reproduces the ranking in the browser. That makes GitHub Pages a valid
+# host for a live demo. Enable Pages (Settings → Pages → Source: GitHub Actions)
+# and every push to main refreshes it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/resonance/api/static/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the snapshot is present
+        run: test -s src/resonance/api/static/snapshot.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/resonance/api/static
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

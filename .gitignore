@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Local experiments. The committed artefacts under models/ and reports/ are
+# intentionally tracked so the dashboard and the container work on a fresh clone.
+data/processed/*
+!data/processed/.gitkeep
+scratch/
+*.log
