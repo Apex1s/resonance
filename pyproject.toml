@@ -40,7 +40,7 @@ resonance-train = "resonance.train:main"
 resonance-snapshot = "resonance.export_snapshot:main"
 
 [project.urls]
-Repository = "https://github.com/anassabbahi/resonance"
+Repository = "https://github.com/Apex1s/resonance"
 
 [tool.setuptools.packages.find]
 where = ["src"]
