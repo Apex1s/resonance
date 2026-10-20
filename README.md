@@ -3,11 +3,12 @@
 A music recommender built on Spotify audio features. You give it a track you
 like, it gives you a playlist, and it tells you why each song is in there.
 
-[![CI](https://github.com/Apex1s/resonance/actions/workflows/ci.yml/badge.svg)](https://github.com/aApex1s/resonance/actions/workflows/ci.yml)
+[![CI](https://github.com/Apex1s/resonance/actions/workflows/ci.yml/badge.svg)](https://github.com/Apex1s/resonance/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3%2B-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.9%2B-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-GitHub%20Pages-1DB954)](https://apex1s.github.io/resonance/)
 
 ![The playlist mixer](docs/assets/dashboard-mixer.png)
 
