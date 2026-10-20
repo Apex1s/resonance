@@ -2,7 +2,7 @@
 PY ?= python3
 PORT ?= 8000
 
-.PHONY: help install train train-fast snapshot serve test lint format docker docker-run clean all
+.PHONY: help install train train-fast snapshot serve test lint format docker docker-run lock clean all
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -39,5 +39,9 @@ docker-run: ## Run the container on http://localhost:$(PORT)
 
 all: train snapshot test ## Train, rebuild the snapshot, then test
 
-clean: ## Remove caches and generated artefacts
-	rm -rf .pytest_cache .ruff_cache **/__pycache__ models/*.joblib models/*.npz models/*.csv reports/metrics.json
+lock: ## Re-resolve requirements.lock (exact versions for Docker and CI)
+	uv pip compile pyproject.toml --universal --python-version 3.12 --no-header -o requirements.lock
+
+clean: ## Remove caches (trained artefacts are tracked and kept; `make train` rebuilds them)
+	rm -rf .pytest_cache .ruff_cache
+	find . -name __pycache__ -type d -prune -exec rm -rf {} +

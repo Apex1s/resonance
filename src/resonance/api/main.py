@@ -10,14 +10,17 @@ documented at ``/docs``.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -38,6 +41,42 @@ STATIC_DIR = Path(__file__).parent / "static"
 state: dict = {"engine": None, "metrics": None, "error": None}
 
 
+def _load_metrics() -> dict | None:
+    if not config.METRICS_PATH.exists():
+        return None
+    try:
+        return json.loads(config.METRICS_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        LOGGER.warning("metrics unavailable: %s", exc)
+        return None
+
+
+def _inline_script_hashes(page: Path) -> str:
+    """CSP source list allowing exactly the inline scripts of the dashboard."""
+    if not page.exists():
+        return ""
+    scripts = re.findall(r"<script>(.*?)</script>", page.read_text(encoding="utf-8"), re.S)
+    return " ".join(
+        "'sha256-" + base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).decode() + "'"
+        for s in scripts
+    )
+
+
+DASHBOARD_CSP = "; ".join(
+    [
+        "default-src 'self'",
+        f"script-src 'self' {_inline_script_hashes(STATIC_DIR / 'index.html')}".strip(),
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src https://fonts.gstatic.com",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'",
+    ]
+)
+
+
 # --------------------------------------------------------------------------- #
 # Lifespan
 # --------------------------------------------------------------------------- #
@@ -50,10 +89,9 @@ async def lifespan(app: FastAPI):
         state["error"] = str(exc)
         LOGGER.warning("engine unavailable: %s", exc)
 
-    if config.METRICS_PATH.exists():
-        state["metrics"] = json.loads(config.METRICS_PATH.read_text())
+    state["metrics"] = _load_metrics()
     yield
-    state.clear()
+    state.update(engine=None, metrics=None, error=None)
 
 
 app = FastAPI(
@@ -67,11 +105,25 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    # /docs and /redoc load their assets from a CDN, so the strict policy is
+    # limited to the dashboard.
+    path = request.url.path
+    if path == "/" or path.startswith("/static"):
+        response.headers.setdefault("Content-Security-Policy", DASHBOARD_CSP)
+        response.headers.setdefault("X-Frame-Options", "DENY")
+    return response
 
 
 def engine() -> RecommendationEngine:
@@ -168,7 +220,7 @@ def insights() -> JSONResponse:
 # --------------------------------------------------------------------------- #
 @app.get("/api/tracks", response_model=list[Track], tags=["catalog"])
 def list_tracks(
-    q: str = Query("", description="search title or artist"),
+    q: str = Query("", max_length=100, description="search title or artist"),
     limit: int = Query(25, ge=1, le=200),
     sort: str = Query("p_like", pattern="^(p_like|tempo|energy|danceability|valence|duration_ms)$"),
 ) -> list[dict]:

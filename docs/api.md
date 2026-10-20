@@ -11,7 +11,7 @@ artefacts are missing, so run `python -m resonance.train` first.
 ## `GET /api/health`
 
 ```json
-{"status":"ok","version":"1.0.0","tracks":1999,"model":"Hist Gradient Boosting","metrics_loaded":true}
+{"status":"ok","version":"1.0.0","tracks":1981,"model":"Hist Gradient Boosting","metrics_loaded":true}
 ```
 
 ## `GET /api/tracks`

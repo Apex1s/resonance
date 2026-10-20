@@ -9,21 +9,25 @@ Outputs
 -------
 models/taste_model.joblib    fitted end-to-end pipeline (preprocessing + model)
 models/track_embeddings.npz  similarity space + track vectors
-models/catalog.csv           catalog enriched with the predicted like-probability
+models/catalog.csv           catalog enriched with the out-of-fold like-probability
+src/resonance/model_manifest.json  checksum the API verifies before loading the model
 reports/metrics.json         everything the dashboard renders
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import joblib
 import numpy as np
 import pandas as pd
+import sklearn
+from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.ensemble import (
     ExtraTreesClassifier,
@@ -45,7 +49,13 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_validate
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    cross_val_predict,
+    cross_val_score,
+    cross_validate,
+)
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
@@ -104,6 +114,47 @@ def make_pipeline(model) -> Pipeline:
     return Pipeline([("prep", build_preprocessor()), ("model", model)])
 
 
+def _cv() -> StratifiedKFold:
+    return StratifiedKFold(n_splits=config.CV_FOLDS, shuffle=True, random_state=config.RANDOM_STATE)
+
+
+def calibrate(pipe: Pipeline) -> CalibratedClassifierCV:
+    return CalibratedClassifierCV(clone(pipe), method="isotonic", cv=5)
+
+
+def cv_brier(estimator, X: pd.DataFrame, y: pd.Series) -> float:
+    """Cross-validated Brier score on the training split (lower is better)."""
+    scores = cross_val_score(clone(estimator), X, y, cv=_cv(), scoring="neg_brier_score", n_jobs=1)
+    return float(-scores.mean())
+
+
+def out_of_fold_proba(estimator, X_train, y_train, X_test, idx_train, idx_test, n: int) -> np.ndarray:
+    """Like-probability for every row, never scored by a model that saw it.
+
+    Training rows get out-of-fold predictions; test rows get the final model,
+    which was fitted on the training split only. Scoring the training rows with
+    the final model would hand them near-perfect in-sample probabilities.
+    """
+    proba = np.empty(n, dtype=float)
+    proba[idx_train] = cross_val_predict(
+        clone(estimator), X_train, y_train, cv=_cv(), method="predict_proba", n_jobs=1
+    )[:, 1]
+    proba[idx_test] = estimator.predict_proba(X_test)[:, 1]
+    return proba
+
+
+def write_model_manifest(model_path, model_name: str) -> dict:
+    """Record the checksum the API verifies before unpickling the model."""
+    manifest = {
+        "file": model_path.name,
+        "sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
+        "sklearn_version": sklearn.__version__,
+        "model_name": model_name,
+    }
+    config.MODEL_MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
 def _curve(x: np.ndarray, y: np.ndarray, n: int = 120) -> list[list[float]]:
     """Down-sample a curve so metrics.json stays small."""
     idx = np.arange(len(x)) if len(x) <= n else np.unique(np.linspace(0, len(x) - 1, n).astype(int))
@@ -115,7 +166,7 @@ def _curve(x: np.ndarray, y: np.ndarray, n: int = 120) -> list[list[float]]:
 # --------------------------------------------------------------------------- #
 def compare_models(X: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
     """Stratified cross-validation of every candidate on the training split."""
-    cv = StratifiedKFold(n_splits=config.CV_FOLDS, shuffle=True, random_state=config.RANDOM_STATE)
+    cv = _cv()
     scoring = ["roc_auc", "accuracy", "f1", "average_precision"]
     rows = []
     for name, model in candidate_models().items():
@@ -144,8 +195,7 @@ def tune(name: str, X: pd.DataFrame, y: pd.Series) -> tuple[Pipeline, dict, floa
     if not grid:
         pipe.fit(X, y)
         return pipe, {}, float("nan")
-    cv = StratifiedKFold(n_splits=config.CV_FOLDS, shuffle=True, random_state=config.RANDOM_STATE)
-    search = GridSearchCV(pipe, grid, scoring="roc_auc", cv=cv, n_jobs=-1, refit=True)
+    search = GridSearchCV(pipe, grid, scoring="roc_auc", cv=_cv(), n_jobs=-1, refit=True)
     search.fit(X, y)
     LOGGER.info("%-24s tuned AUC=%.4f %s", name, search.best_score_, search.best_params_)
     return search.best_estimator_, search.best_params_, float(search.best_score_)
@@ -241,13 +291,17 @@ def run(fast: bool = False) -> dict:
 
     leaderboard = compare_models(X_train, y_train)
 
-    if fast:
+    # Tune the three best candidates that have a grid. When none of them has
+    # one (or with --fast), the cross-validation winner ships untuned.
+    shortlist = [n for n in leaderboard["model"].head(3) if n in PARAM_GRIDS]
+    if fast or not shortlist:
+        if not fast:
+            LOGGER.info("no tunable model in the top 3, keeping the CV winner untuned")
         best_name = str(leaderboard.iloc[0]["model"])
         best_pipe = make_pipeline(candidate_models()[best_name]).fit(X_train, y_train)
         best_params, tuned_cv = {}, float(leaderboard.iloc[0]["roc_auc"])
         tuning_table = []
     else:
-        shortlist = [n for n in leaderboard["model"].head(3) if n in PARAM_GRIDS]
         tuning_table, tuned = [], {}
         for name in shortlist:
             pipe, params, score = tune(name, X_train, y_train)
@@ -259,19 +313,18 @@ def run(fast: bool = False) -> dict:
     LOGGER.info("winner: %s", best_name)
 
     # Probability calibration. Recommendation scores are blended with
-    # similarity, so they have to mean something on an absolute scale.
-    calibrated = CalibratedClassifierCV(best_pipe, method="isotonic", cv=5)
-    calibrated.fit(X_train, y_train)
-
-    raw_eval = evaluate(best_pipe, X_test, y_test)
-    cal_eval = evaluate(calibrated, X_test, y_test)
-    use_calibrated = cal_eval["brier"] <= raw_eval["brier"]
-    final_pipe = calibrated if use_calibrated else best_pipe
-    final_eval = cal_eval if use_calibrated else raw_eval
+    # similarity, so they have to mean something on an absolute scale. Whether
+    # to keep it is decided by cross-validation on the training split: the test
+    # split is only ever used to report the final model.
+    raw_brier = cv_brier(best_pipe, X_train, y_train)
+    cal_brier = cv_brier(calibrate(best_pipe), X_train, y_train)
+    use_calibrated = cal_brier <= raw_brier
+    final_pipe = calibrate(best_pipe).fit(X_train, y_train) if use_calibrated else best_pipe
+    final_eval = evaluate(final_pipe, X_test, y_test)
     LOGGER.info(
-        "calibration: brier %.4f -> %.4f (%s)",
-        raw_eval["brier"],
-        cal_eval["brier"],
+        "calibration (CV brier): %.4f -> %.4f (%s)",
+        raw_brier,
+        cal_brier,
         "kept" if use_calibrated else "discarded",
     )
 
@@ -285,6 +338,7 @@ def run(fast: bool = False) -> dict:
         {"pipeline": final_pipe, "model_name": best_name, "calibrated": use_calibrated},
         config.TASTE_MODEL_PATH,
     )
+    manifest = write_model_manifest(config.TASTE_MODEL_PATH, best_name)
 
     space = EmbeddingSpace().fit(engineer(df))
     vectors = space.transform(engineer(df))
@@ -299,7 +353,9 @@ def run(fast: bool = False) -> dict:
     )
 
     catalog = df.copy()
-    catalog["p_like"] = final_pipe.predict_proba(X)[:, 1].round(4)
+    catalog["p_like"] = out_of_fold_proba(
+        final_pipe, X_train, y_train, X_test, idx_train, idx_test, len(df)
+    ).round(4)
     catalog["in_test_split"] = False
     catalog.loc[idx_test, "in_test_split"] = True
     catalog.to_csv(config.CATALOG_PATH, index=False)
@@ -310,7 +366,7 @@ def run(fast: bool = False) -> dict:
     chi_df = stats.chi_square(df)
 
     metrics = {
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "dataset": data.describe(df),
         "split": {
             "train": int(len(X_train)),
@@ -325,8 +381,10 @@ def run(fast: bool = False) -> dict:
             "params": {k.replace("model__", ""): v for k, v in (best_params or {}).items()},
             "cv_roc_auc": round(tuned_cv, 4) if tuned_cv == tuned_cv else None,
             "calibrated": use_calibrated,
-            "calibration_gain_brier": round(raw_eval["brier"] - cal_eval["brier"], 4),
+            "calibration_gain_brier": round(raw_brier - cal_brier, 4),
+            "calibration_decided_on": "cross-validated brier, training split",
         },
+        "model_artifact": manifest,
         "test_metrics": final_eval,
         "permutation_importance": perm,
         "anova": anova_df.to_dict(orient="records"),

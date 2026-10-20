@@ -4,7 +4,7 @@ A music recommender built on Spotify audio features. You give it a track you
 like, it gives you a playlist, and it tells you why each song is in there.
 
 [![CI](https://github.com/Apex1s/resonance/actions/workflows/ci.yml/badge.svg)](https://github.com/aApex1s/resonance/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3%2B-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
@@ -13,7 +13,8 @@ like, it gives you a playlist, and it tells you why each song is in there.
 
 ## The idea
 
-The dataset is 2,017 tracks that one listener labelled as liked or skipped.
+The dataset is 2,017 tracks (1,981 distinct songs) that one listener labelled
+as liked or skipped.
 The usual exercise is to train a classifier on it, which works fine (about
 0.85 AUC), but a classifier on its own cannot build a playlist. Rank every
 track by `P(like)` and you get the same list every time, no matter what you
@@ -39,6 +40,7 @@ More on the design in [docs/architecture.md](docs/architecture.md).
 ```bash
 git clone https://github.com/Apex1s/resonance.git
 cd resonance
+pip install -r requirements.lock   # Python 3.11+, exact versions the model was trained with
 pip install -e ".[dev]"
 
 make serve      # dashboard and API on http://localhost:8000
@@ -96,24 +98,26 @@ Eight models, same preprocessing, 5-fold stratified cross-validation:
 
 | Model | CV ROC-AUC | Accuracy | F1 |
 |---|---|---|---|
-| **Hist Gradient Boosting** | **0.850 ± 0.009** | 0.772 | 0.774 |
-| Random Forest | 0.847 ± 0.004 | 0.763 | 0.764 |
-| Gradient Boosting | 0.840 ± 0.007 | 0.757 | 0.754 |
-| Extra Trees | 0.837 ± 0.008 | 0.760 | 0.755 |
-| SVM (RBF) | 0.821 ± 0.011 | 0.739 | 0.729 |
-| k-Nearest Neighbours | 0.811 ± 0.012 | 0.729 | 0.694 |
-| Logistic Regression | 0.770 ± 0.014 | 0.711 | 0.702 |
-| Decision Tree | 0.678 ± 0.024 | 0.678 | 0.678 |
+| Random Forest | 0.857 ± 0.020 | 0.776 | 0.771 |
+| **Hist Gradient Boosting** | **0.852 ± 0.016** | 0.766 | 0.763 |
+| Gradient Boosting | 0.849 ± 0.023 | 0.762 | 0.756 |
+| Extra Trees | 0.846 ± 0.020 | 0.762 | 0.755 |
+| SVM (RBF) | 0.838 ± 0.020 | 0.758 | 0.746 |
+| k-Nearest Neighbours | 0.823 ± 0.019 | 0.729 | 0.684 |
+| Logistic Regression | 0.786 ± 0.028 | 0.731 | 0.721 |
+| Decision Tree | 0.664 ± 0.035 | 0.664 | 0.663 |
 
-The top three get a grid search, and the winner is wrapped in isotonic
-calibration if that improves the Brier score (here it does, 0.166 to 0.161).
-That step matters because the probability is added to a similarity term, so it
-has to mean something on its own.
+The top three get a grid search; tuned, Hist Gradient Boosting edges ahead
+(CV ROC-AUC 0.860) and ships. It is wrapped in isotonic calibration if that
+improves the cross-validated Brier score on the training split (here it does,
+0.155 to 0.151). That step matters because the probability is added to a
+similarity term, so it has to mean something on its own. The test split plays
+no part in either choice: it is only used to report the final model.
 
-On the 500 held-out tracks: **ROC-AUC 0.845**, accuracy 78.4%, F1 0.794,
-Brier 0.161. Confusion matrix 184 / 64 / 44 / 208.
+On the 496 held-out tracks: **ROC-AUC 0.830**, accuracy 76.0%, F1 0.767,
+Brier 0.169. Confusion matrix 181 / 67 / 52 / 196.
 
-Precision@10 is 1.00 and precision@50 is 0.96, against a 50.4% base rate. That
+Precision@10 is 0.90 and precision@50 is 0.94, against a 50.1% base rate. That
 is the number worth quoting for a recommender: AUC describes the whole ranking,
 but a user only ever sees the top of it.
 
@@ -123,11 +127,11 @@ Permutation importance on the test split, next to the ANOVA effect sizes:
 
 | Feature | Importance | Cohen's *d* |
 |---|---|---|
-| `instrumentalness` | 0.126 | +0.30 |
-| `speechiness` | 0.046 | +0.32 |
-| `loudness` | 0.035 | -0.14 |
-| `danceability` | 0.031 | +0.37 |
-| `duration_ms` | 0.029 | +0.29 |
+| `instrumentalness` | 0.112 | +0.31 |
+| `speechiness` | 0.036 | +0.33 |
+| `loudness` | 0.036 | -0.13 |
+| `danceability` | 0.029 | +0.37 |
+| `duration_ms` | 0.020 | +0.29 |
 
 Vocals or no vocals is the strongest signal by a wide margin. With n ≈ 2,000
 nearly everything clears p < 0.05, so the reports carry Cohen's *d* and a
@@ -173,12 +177,34 @@ Other things worth knowing:
 - Scalers and encoders live inside the `Pipeline`, so cross-validation fits
   them fold by fold and nothing leaks.
 - CI retrains, boots the API, calls it, and fails if AUC drops below 0.80.
-- 42 tests cover the pipeline, the ranking and the HTTP contract.
+- 54 tests cover the pipeline, the ranking, the HTTP contract and the
+  hardening below.
+
+Deployment notes:
+
+- The model is a pickle, and unpickling runs code. Training writes its SHA-256
+  to `src/resonance/model_manifest.json`, inside the package, and the API
+  refuses to load a `taste_model.joblib` that does not match. Retrieval keeps
+  working without it; only profile scoring needs the model. For local
+  experiments only, `RESONANCE_ALLOW_UNVERIFIED_MODEL=1` skips the check when
+  there is no manifest.
+- `requirements.lock` pins every dependency (`make lock` regenerates it). The
+  Docker image and the CI pipeline job install from it, so the model is loaded
+  by the scikit-learn version it was trained with.
+- CORS defaults to `*` (read-only API, no cookies). Set
+  `RESONANCE_CORS_ORIGINS=https://example.org,...` when deploying. There is no
+  authentication or rate limiting in the app: put it behind a reverse proxy
+  that rate-limits if it is exposed publicly.
+- The dashboard is served with a Content-Security-Policy that allows only its
+  own inline script (by hash), plus `nosniff`, `X-Frame-Options: DENY` and
+  `Referrer-Policy: no-referrer`.
 
 ## Dataset
 
-2,017 tracks from the Spotify Web API audio-features endpoint, 1,999 after
-de-duplication, with one listener's like/skip label. Columns and provenance in
+2,017 tracks from the Spotify Web API audio-features endpoint, 1,981 after
+de-duplication on title and artist (a song repeated with a different duration
+would otherwise sit on both sides of the train/test split), with one listener's
+like/skip label. Columns and provenance in
 [data/README.md](data/README.md).
 
 Worth being precise about: `target` is one person's taste, not chart

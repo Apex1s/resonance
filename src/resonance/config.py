@@ -23,6 +23,15 @@ MODELS_DIR = Path(os.getenv("RESONANCE_MODELS_DIR", PROJECT_ROOT / "models"))
 REPORTS_DIR = Path(os.getenv("RESONANCE_REPORTS_DIR", PROJECT_ROOT / "reports"))
 
 TASTE_MODEL_PATH = MODELS_DIR / "taste_model.joblib"
+
+#: Checksum of the taste model, written by training. It ships inside the
+#: package rather than next to the model, so swapping the pickle in MODELS_DIR
+#: (a mounted volume, RESONANCE_MODELS_DIR) does not get it loaded.
+MODEL_MANIFEST_PATH = PACKAGE_ROOT / "model_manifest.json"
+
+#: Set to "1" to load a model with no manifest entry (local experiments only:
+#: unpickling runs arbitrary code from the file).
+ALLOW_UNVERIFIED_MODEL = os.getenv("RESONANCE_ALLOW_UNVERIFIED_MODEL") == "1"
 EMBEDDING_PATH = MODELS_DIR / "track_embeddings.npz"
 CATALOG_PATH = MODELS_DIR / "catalog.csv"
 METRICS_PATH = REPORTS_DIR / "metrics.json"
@@ -112,3 +121,7 @@ LIVE_THRESHOLD = 0.8
 
 API_TITLE = "Resonance API"
 API_VERSION = "1.0.0"
+
+#: Comma-separated origins allowed by CORS. The API is read-only and uses no
+#: cookies, so "*" is the default; set explicit origins when deploying.
+CORS_ORIGINS = [o.strip() for o in os.getenv("RESONANCE_CORS_ORIGINS", "*").split(",") if o.strip()]

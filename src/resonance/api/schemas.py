@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AudioProfile(BaseModel):
@@ -36,6 +36,12 @@ class FilterSpec(BaseModel):
     instrumental_only: bool = False
     exclude_spoken: bool = False
     exclude_artists: list[str] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def _tempo_range(self) -> FilterSpec:
+        if self.tempo_min is not None and self.tempo_max is not None and self.tempo_min > self.tempo_max:
+            raise ValueError("tempo_min must not exceed tempo_max")
+        return self
 
 
 class RecommendRequest(BaseModel):

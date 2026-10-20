@@ -1,0 +1,6 @@
+{
+  "file": "taste_model.joblib",
+  "sha256": "af37226fc02efb04b49dc458946f0f8443ea64d0c3dbe56bfe8be2d5bfd104bd",
+  "sklearn_version": "1.9.1",
+  "model_name": "Hist Gradient Boosting"
+}

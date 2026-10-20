@@ -2,7 +2,7 @@
 
 ## Why two scores instead of one
 
-A classifier alone cannot build a playlist. Rank 1,999 tracks by `P(like)` and
+A classifier alone cannot build a playlist. Rank 1,981 tracks by `P(like)` and
 everyone gets the same list, whatever they seeded it with. The model knows the
 listener but not the moment.
 
@@ -81,8 +81,9 @@ that.
 The blend adds a similarity term to a probability, so the probability has to
 mean something on an absolute scale. Tree ensembles are usually over-confident,
 so the winning pipeline is wrapped in `CalibratedClassifierCV(method="isotonic",
-cv=5)` and kept only if the Brier score improves. On the current run it does:
-0.166 → 0.161, so the calibrated model ships.
+cv=5)` and kept only if the Brier score improves under cross-validation on
+the training split (the test split never takes part in the decision). On the
+current run it does: 0.155 → 0.151, so the calibrated model ships.
 
 ## Explanations
 
@@ -110,7 +111,11 @@ One thing cannot cross over: scikit-learn itself. Scoring a *hand-built* profile
 needs the model, so offline the dashboard estimates it as a similarity-weighted
 average of `p_like` over the 25 nearest real tracks, and says so on screen.
 Recommendations from real seeds are unaffected: `p_like` for catalog tracks is
-precomputed at training time and travels in the snapshot.
+precomputed at training time and travels in the snapshot. It is computed out of
+sample: training tracks are scored by cross-validation models that never saw
+them, test tracks by the final model. Scoring the training tracks with the
+final model would give them near-certain probabilities (ROC-AUC 0.997 against
+0.845 on the test tracks in an earlier version) and push them up every ranking.
 
 ## Layout
 

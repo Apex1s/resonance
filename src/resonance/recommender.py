@@ -12,6 +12,9 @@ Relevance so a playlist does not collapse into ten versions of the same song.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -21,9 +24,44 @@ import pandas as pd
 from . import config
 from .features import EmbeddingSpace, engineer, feature_matrix
 
+LOGGER = logging.getLogger("resonance.engine")
+
 
 class ArtifactsMissing(RuntimeError):
     """Raised when the engine is used before `python -m resonance.train` ran."""
+
+
+class UntrustedModel(RuntimeError):
+    """Raised when the taste model does not match the checksum from training."""
+
+
+def verify_model(model_path: Path) -> None:
+    """Refuse to unpickle a model whose checksum training did not record.
+
+    ``joblib.load`` runs arbitrary code embedded in the file, so the bytes are
+    checked against :data:`config.MODEL_MANIFEST_PATH` first.
+    """
+    manifest_path = config.MODEL_MANIFEST_PATH
+    if not manifest_path.exists():
+        if config.ALLOW_UNVERIFIED_MODEL:
+            LOGGER.warning("no model manifest, loading %s unverified", model_path)
+            return
+        raise UntrustedModel(f"{manifest_path.name} not found, refusing to load {model_path.name}")
+
+    manifest = json.loads(manifest_path.read_text())
+    digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    if digest != manifest.get("sha256"):
+        raise UntrustedModel(f"{model_path.name} does not match the checksum recorded at training")
+
+    import sklearn
+
+    trained_with = manifest.get("sklearn_version")
+    if trained_with and trained_with != sklearn.__version__:
+        LOGGER.warning(
+            "taste model was trained with scikit-learn %s, running %s; install requirements.lock",
+            trained_with,
+            sklearn.__version__,
+        )
 
 
 @dataclass(slots=True)
@@ -113,8 +151,15 @@ class RecommendationEngine:
         if model_path.exists():
             import joblib
 
-            bundle = joblib.load(model_path)
-            model, model_name = bundle["pipeline"], bundle.get("model_name", "unknown")
+            try:
+                verify_model(model_path)
+            except UntrustedModel as exc:
+                # Retrieval still works from the catalog and embeddings; only
+                # scoring of hand-built profiles needs the model.
+                LOGGER.error("taste model not loaded: %s", exc)
+            else:
+                bundle = joblib.load(model_path)
+                model, model_name = bundle["pipeline"], bundle.get("model_name", "unknown")
 
         return cls(catalog, blob["vectors"], space, model, model_name)
 

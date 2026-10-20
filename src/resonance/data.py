@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from . import config
+
+LOGGER = logging.getLogger("resonance.data")
 
 
 class SchemaError(ValueError):
@@ -37,7 +40,7 @@ def _validate(df: pd.DataFrame, *, require_target: bool = True) -> None:
 def _make_track_id(row: pd.Series) -> str:
     """Stable, human-free identifier derived from title + artist."""
     raw = f"{row.get('song_title', '')}|{row.get('artist', '')}".lower().strip()
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
 
 
 def load_tracks(path: str | Path | None = None, *, require_target: bool = True) -> pd.DataFrame:
@@ -66,10 +69,21 @@ def load_tracks(path: str | Path | None = None, *, require_target: bool = True) 
             df[col] = ""
         df[col] = df[col].fillna("").astype(str).str.strip()
 
-    df = df.drop_duplicates(subset=config.TEXT_COLUMNS + ["duration_ms"]).reset_index(drop=True)
+    # One row per song. The raw export repeats some songs (re-releases, a
+    # different duration, occasionally a different label); keeping them would
+    # let the same song sit on both sides of the train/test split, and their
+    # IDs would collide since an ID is derived from title + artist.
+    key = df[config.TEXT_COLUMNS[0]].str.lower() + "|" + df[config.TEXT_COLUMNS[1]].str.lower()
+    if require_target:
+        conflicts = df.groupby(key)[config.TARGET].nunique().gt(1).sum()
+        if conflicts:
+            LOGGER.warning("%d song(s) carry both labels; the first occurrence is kept", conflicts)
+    named = key != "|"
+    df = df.loc[~(key.duplicated() & named)].reset_index(drop=True)
     df[config.ID_COLUMN] = df.apply(_make_track_id, axis=1)
 
-    # Collisions are vanishingly unlikely but would silently break lookups.
+    # Untitled rows (inference catalogs) share an ID; suffix them so lookups
+    # stay unique.
     dupes = df[config.ID_COLUMN].duplicated()
     if dupes.any():
         suffix = dupes.groupby(df[config.ID_COLUMN]).cumsum().astype(str)

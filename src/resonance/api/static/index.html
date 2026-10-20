@@ -752,7 +752,7 @@ function anova(sel, rows){
         const p = r.p_value<1e-4 ? r.p_value.toExponential(1) : r.p_value.toFixed(4);
         const strong = Math.abs(r.cohens_d)>=0.2;
         return `<tr>
-          <td>${PRETTY[r.feature]||r.feature}</td>
+          <td>${esc(PRETTY[r.feature]||r.feature)}</td>
           <td class="num">${r.f_statistic.toFixed(1)}</td>
           <td class="num" style="color:${r.significant?"#ffffff":"#6f6f6f"}">${p}</td>
           <td class="num" style="color:${strong?(r.cohens_d>0?"#1db954":"#3987e5"):"#6f6f6f"}">${r.cohens_d>0?"+":""}${r.cohens_d.toFixed(2)}</td>

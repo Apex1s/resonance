@@ -7,7 +7,7 @@ name = "resonance"
 version = "1.0.0"
 description = "Hybrid audio-feature recommendation engine for Spotify tracks"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "Anas Sabbahi" },
@@ -46,7 +46,7 @@ Repository = "https://github.com/Apex1s/resonance"
 where = ["src"]
 
 [tool.setuptools.package-data]
-resonance = ["api/static/*"]
+resonance = ["api/static/*", "model_manifest.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -56,7 +56,7 @@ filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.ruff]
 line-length = 110
-target-version = "py310"
+target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]

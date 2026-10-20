@@ -1,13 +1,15 @@
 # ---- build -----------------------------------------------------------------
-FROM python:3.12-slim AS build
+# Base image pinned by digest; refresh it deliberately (docker pull, then
+# update the digest) rather than picking up whatever 3.12-slim points to.
+FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS build
 WORKDIR /build
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src
 RUN pip install --no-cache-dir --upgrade pip build \
- && pip wheel --no-cache-dir --wheel-dir /wheels .
+ && pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
 
 # ---- runtime ---------------------------------------------------------------
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
 LABEL org.opencontainers.image.title="Resonance" \
       org.opencontainers.image.description="Hybrid audio-feature recommendation engine" \
       org.opencontainers.image.licenses="MIT"
@@ -20,7 +22,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY --from=build /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels
+COPY requirements.lock /tmp/requirements.lock
+# Exact dependency versions from the lock file: the shipped model is a pickle
+# and must be loaded by the scikit-learn version it was trained with.
+RUN pip install --no-cache-dir -r /tmp/requirements.lock \
+ && pip install --no-cache-dir --no-deps /wheels/*.whl \
+ && rm -rf /wheels /tmp/requirements.lock
 
 # Pre-trained artefacts ship with the image so the container is useful on boot.
 COPY models ./models
